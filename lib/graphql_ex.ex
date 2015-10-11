@@ -1,0 +1,2 @@
+defmodule GraphqlEx do
+end
