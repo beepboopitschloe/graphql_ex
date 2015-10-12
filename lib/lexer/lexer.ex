@@ -85,7 +85,7 @@ defmodule GraphQL.Lexer do
 
       x ->
         raise "syntax error: #{position}, unexpected character
-          #{x}"
+          #{inspect x}"
     end
 
     %{
@@ -128,7 +128,7 @@ defmodule GraphQL.Lexer do
 
     case code do
       <<x>> when x in [0x000A, 0x000D] ->
-        position
+        position_after_whitespace(body, position)
       _ ->
         position_after_newline(body, position + 1)
     end
@@ -138,8 +138,21 @@ defmodule GraphQL.Lexer do
   Read a name from `source` starting from `position`.
   Return `{:name, <end position>, <name as string>}`.
   """
-  defp read_name source, position do
-    raise "no impl"
+  defp read_name source, position, acc \\ "" do
+    body = source.body
+    char = String.at body, position
+
+    case char do
+      <<x>> when x == 95 # _
+          or (x >= 48 and x <= 57) # 0-9
+          or (x >= 65 and x <= 90) # A-Z
+          or (x >= 97 and x <= 122) # a-z
+          ->
+        read_name(source, position + 1, acc <> char)
+
+      _ ->
+        {:name, position, acc}
+    end
   end
 
   @doc """
