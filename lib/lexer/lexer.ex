@@ -4,16 +4,12 @@ defmodule GraphQL.Lexer do
   Get a generator function to get the next source token from `source`.
   """
   def lex source do
-    prevPosition = 0
-
-    fn source ->
+    fn (position) ->
       token = read_token(
         source,
-        prevPosition
+        position
       )
 
-      prevPosition = token.end
-      
       token
     end
   end
@@ -39,11 +35,13 @@ defmodule GraphQL.Lexer do
         {:eof, position, nil}
 
       # handle names
-      x when x == "_" or (x >= 65 and x <= 90) or (x >= 97 and x <= 122) ->
+      # 95 is _
+      <<x>> when x == 95 or (x >= 65 and x <= 90) or (x >= 97 and x <= 122) ->
         read_name source, position
 
       # handle numbers
-      x when x == "-" or (x >= 48 and x <= 57) ->
+      # 45 is -
+      <<x>> when x == 45 or (x >= 48 and x <= 57) ->
         read_number source, position
 
       # handle strings
@@ -86,8 +84,8 @@ defmodule GraphQL.Lexer do
         {:brace_r, position + 1, nil}
 
       x ->
-        raise "syntax error: #{source}, #{position}, unexpected character
-          #{to_string x}"
+        raise "syntax error: #{position}, unexpected character
+          #{x}"
     end
 
     %{
@@ -101,8 +99,39 @@ defmodule GraphQL.Lexer do
   @doc """
   Skip all whitespace after `position` in `str` and return the new position.
   """
-  defp position_after_whitespace str, position do
-    raise "no impl"
+  defp position_after_whitespace body, position do
+    body_length = String.length body
+
+    if position < body_length do
+      # skip ignored characters
+      code = String.at body, position
+
+      case code do
+        <<x>> when x in [0xFEFF, 0x0009, 0x0020, 0x000A, 0x000D, 0x002C] ->
+          position_after_whitespace(body, position + 1)
+        "#" ->
+          position_after_newline(body, position)
+        _ ->
+          position
+      end
+    else
+      position
+    end
+  end
+
+  @doc """
+  Skip until the next newline from `position` in `body` and return the new
+  position.
+  """
+  defp position_after_newline body, position do
+    code = String.at body, position
+
+    case code do
+      <<x>> when x in [0x000A, 0x000D] ->
+        position
+      _ ->
+        position_after_newline(body, position + 1)
+    end
   end
 
   @doc """
